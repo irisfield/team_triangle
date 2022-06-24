@@ -70,8 +70,9 @@ def image_callback(ros_image):
     (width, height, _) = cv_image.shape
 
     # crop the camera image
-    new_width = int(width / 3)
-    cv_image = cv_image[new_width:, :]
+    half_width = int(width / 2)
+    quarter_height = int(height / 4)
+    cv_image = cv_image[half_width:,quarter_height:(quarter_height * 3)]
 
     # convert to grayscale
     gray_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
@@ -79,7 +80,7 @@ def image_callback(ros_image):
     # apply filters
     filtered_image = cv2.medianBlur(gray_image, 15)
 
-    # filtered_image = cv2.Canny(filtered_image, RC.thresh, 255, 3)
+    filtered_image = cv2.Canny(filtered_image, RC.thresh, 255, 3)
 
     element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
@@ -120,8 +121,9 @@ def image_callback(ros_image):
     cv2.circle(cv_image, (cx, cy), 8, (180, 0, 0), -1)  # -1 fill the circle
 
     # offset the x position of the robot to follow the lane
-    cx -= 170
+    # cx -= 170
 
+    # drive_to_follow_line(filtered_image, cx, cy, width, height)
     drive_to_follow_line(filtered_image, cx, cy, width, height)
 
     cv2.imshow("CV Image", cv_image)
@@ -137,8 +139,8 @@ def drive_to_follow_line(image, cx, cy, width, height):
         vel_msg.linear.x = RC.speed
 
         # get the center position of the car"s camera view
-        camera_center_y = (width / 2) # corresponds to x
-        camera_center_x = (height / 2) # corresponds to y
+        camera_center_x = (width / 2) # corresponds to x
+        camera_center_y = (height / 2) # corresponds to y
 
 
         # compute the difference between vertical center of the centroid and car"s camera view
@@ -182,7 +184,7 @@ def drive_controller():
     enable_empty_msg = Empty() # required for the vehicle
 
     # this variable controls whether or not to wait to seconds before moving the vehicle
-    use_stop_time = False
+    use_stop_time = True
     time_start = rospy.Time.now()
     time_stop = 2 # in seconds
 
@@ -192,8 +194,6 @@ def drive_controller():
             time_elapsed = (rospy.Time.now() - time_start).to_sec()
             if (time_elapsed < time_stop):
                 vel_msg.linear.x = 0.0
-            else:
-                vel_msg.linear.x = RC.speed
 
         enable_drive_pub.publish(enable_empty_msg)
         cmd_vel_pub.publish(vel_msg)

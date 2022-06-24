@@ -9,7 +9,7 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge, CvBridgeError
 from dynamic_reconfigure.server import Server
-from follow_lane_pkg.cfg import DetectYellowConfig   # ../cfg/DetectYellow.cfg
+from team_triangle.cfg import DetectYellowConfig   # ../cfg/DetectYellow.cfg
 
 # global variables
 msg = Bool()
