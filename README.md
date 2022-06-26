@@ -10,8 +10,23 @@ Make sure you have the following packages in your workspace:
 - DataspeedInc's [dwb_polaris_can](https://bitbucket.org/DataspeedInc/dbw_polaris_ros)
 - Allied Vision's [avt_vimba_camera](https://github.com/astuff/avt_vimba_camera)
 
-# Installation
-Clone this repo to `your_workspace/src` and don't forget to build the package using `catkin_make`.
+# Usage
+On the ACTor vehicle:
+
+Clone this repo to `~/actor_ws/src` and build the package using `catkin build`.
 ```sh
 $ git clone https://github.com/irisfield/team_triangle.git
 ```
+
+Make sure to give execution permission to the scripts:
+```sh
+$ chmod +x team_triangle/scripts/*.py
+```
+
+Assuming you have already sourced the setup script, run the package:
+```sh
+$ roslaunch team_triangle actor_follow_line.launch
+```
+
+# Notes
+- The drive-by-wire CAN bus needs to be connected.
