@@ -4,6 +4,7 @@
 
 import cv2
 import rospy
+import numpy as np
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool, Float32, Empty
@@ -70,30 +71,43 @@ def image_callback(ros_image):
     (width, height, _) = cv_image.shape
 
     # crop the camera image
-    half_width = int(width / 2)
+    third_width = int(width / 3)
     quarter_height = int(height / 4)
-    cv_image = cv_image[half_width:,quarter_height:(quarter_height * 3)]
+    cv_image = cv_image[third_width:, quarter_height:(quarter_height * 3)]
 
+    ################### mask ###################
     # convert to grayscale
-    gray_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+    # gray_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
 
     # apply filters
-    filtered_image = cv2.medianBlur(gray_image, 15)
+    # mask = cv2.medianBlur(gray_image, 15)
 
-    filtered_image = cv2.Canny(filtered_image, RC.thresh, 255, 3)
+    # mask = cv2.Canny(mask, RC.thresh, 255, 3)
 
-    element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    # element = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 
-    filtered_image = cv2.dilate(filtered_image, element)
+    # mask = cv2.dilate(mask, element)
 
+    # binary mask
     # input image, threshol_value, max value in image, threshold type
-    _, filtered_image = cv2.threshold(gray_image, RC.thresh, 255, cv2.THRESH_BINARY)
+    # _, mask = cv2.threshold(gray_image, RC.thresh, 255, cv2.THRESH_BINARY)
+
+    #----------------- HSV method ----------------------------
+    bgr_image = find_white_balance(cv_image)
+    cv2.imshow("White Balance", bgr_image)
+    hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
+
+    lower_bounds = (RC.hue_l, RC.sat_l, RC.val_l)  # lower bounds of H, S, V for the target color
+    upper_bounds = (RC.hue_h, RC.sat_h, RC.val_h)  # upper bounds of H, S, V for the target color
+
+    mask = cv2.inRange(hsv_image, lower_bounds, upper_bounds)
+    ############################################
 
     # blur_kernel = 1 # must be odd, 1, 3, 5, 7 ...
-    # bw_img = cv2.medianBlur(filtered_image, blur_kernel)
+    # bw_img = cv2.medianBlur(mask, blur_kernel)
 
     #find contours in the binary (BW) image
-    contours, _ = cv2.findContours (filtered_image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours (mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     # initialize the variables for computing the centroid and finding the largest contour
     cx = 0
@@ -123,11 +137,11 @@ def image_callback(ros_image):
     # offset the x position of the robot to follow the lane
     # cx -= 170
 
-    # drive_to_follow_line(filtered_image, cx, cy, width, height)
-    drive_to_follow_line(filtered_image, cx, cy, width, height)
+    # drive_to_follow_line(mask, cx, cy, width, height)
+    drive_to_follow_line(mask, cx, cy, width, height)
 
     cv2.imshow("CV Image", cv_image)
-    cv2.imshow("Binary Image", filtered_image)
+    cv2.imshow("Binary Image", mask)
     cv2.waitKey(3)
 
 ################### algorithms ###################
@@ -171,6 +185,21 @@ def drive_to_follow_line(image, cx, cy, width, height):
     else:
         stop_vehicle()
 
+def drive_to_follow_line_2(cv_image, cx, cy, width, height):
+    global sum_steer_error, total_frames
+
+    mid = height / 2
+
+    if RC.enable_drive:
+        vel_msg.linear.x = RC.speed
+        steer_err = mid-cx;
+        vel_msg.angular.z = 0.01*steer_err
+        sum_steer_error += abs(steer_err)
+        total_frames += 1
+    else: # drive disabled
+        stop_vehicle()
+    return
+
 ################### helper functions ###################
 
 def stop_vehicle():
@@ -178,6 +207,16 @@ def stop_vehicle():
     vel_msg.angular.z = 0.0
     cmd_vel_pub.publish(vel_msg)
     return
+
+def find_white_balance(cv_image):
+    result = cv2.cvtColor(cv_image, cv2.COLOR_BGR2LAB)
+    average_a = np.average(result[:,:,1])
+    average_b = np.average(result[:,:,2])
+    result[:,:,1] = result[:,:,1] - ((average_a - 128) * (result[:,:,0] / 255.0) * 1.1)
+    result[:,:,2] = result[:,:,2] - ((average_b - 128) * (result[:,:,0] / 255.0) * 1.1)
+    result = cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+    return result
+
 
 def drive_controller():
     rate = rospy.Rate(20)
